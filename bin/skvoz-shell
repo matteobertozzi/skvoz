@@ -1,0 +1,103 @@
+#!/usr/bin/env python
+# Copyright (c) 2012, Matteo Bertozzi
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#    * Redistributions in binary form must reproduce the above copyright
+#     notice, this list of conditions and the following disclaimer in the
+#     documentation and/or other materials provided with the distribution.
+#   * Neither the name of the <organization> nor the
+#     names of its contributors may be used to endorse or promote products
+#     derived from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+from time import time
+
+from skvoz.aggregation.server.engine import AggregatorEngine, execute_query
+from skvoz.aggregation.server import sources
+from skvoz.util import cmdline
+
+import logging
+import sys
+import os
+
+try:
+    import readline
+except ImportError:
+    pass
+
+def query_prompt():
+    line = None
+    while not line:
+        line = raw_input('>> ').strip()
+    while not line.endswith(';'):
+        l = raw_input('.. ').strip()
+        if len(l) > 0: line += ' ' + l
+    return line[:-1].strip()
+
+def shell_help():
+    print 'Aggregator Shell Help:'
+    print '  help;    Show this screen.'
+    print '  exit;    Quit the shell.'
+
+def shell_exit():
+    sys.exit(0)
+
+def _arg_parser():
+    parser = cmdline.ArgumentParser()
+
+    group = parser.add_argument_group('Data related')
+    group.add_argument('-d', '--data', dest='data_dir', action='store',
+                        help='Default tsdata directory.')
+
+    return parser.parse_args()
+
+if __name__ == '__main__':
+    options = _arg_parser()
+
+    logging.basicConfig()
+    engine = AggregatorEngine()
+    engine.add_source('file', sources.AggregatorFile())
+    if options.data_dir:
+        if not os.path.exists(options.data_dir):
+            print >> sys.stderr, "'%s' is not a directory..." % options.data_dir
+            sys.exit(1)
+
+        engine.add_source('tsfile', sources.AggregatorTsFile(options.data_dir))
+
+    print 'Aggregator Shell'
+    print 'Type "help;" for help.'
+    while True:
+        try:
+            query = query_prompt()
+        except (EOFError, KeyboardInterrupt):
+            break
+
+        # Try to execute a shell command
+        shell_func = globals().get('shell_' + query)
+        if shell_func is not None:
+            shell_func()
+            continue
+
+        # Execute an aggregator query
+        try:
+            st = time()
+            for ts, data in execute_query(engine, query):
+                print ts, data
+            et = time()
+            print 'Query executed in %.3fsec' % (et - st)
+        except Exception, e:
+            print 'query failure:', e

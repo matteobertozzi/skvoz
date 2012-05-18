@@ -1,0 +1,8 @@
+{
+    "name": "Odd-Even",
+    "title": "Odd/Even graph",
+    "renderer": "highchart",
+    "type": "column",
+    "aggregator": ["localhost", 50596],
+    "query": "FROM TSFILE odd, even split n store count(n) as total group by key minute"
+}

@@ -1,0 +1,43 @@
+  ____  _
+ / ___|| | ____   _____ ____
+ \___ \| |/ /\ \ / / _ \_  /
+  ___) |   <  \ V / (_) / /
+ |____/|_|\_\  \_/ \___/___|
+ Collect Aggregate Visualize
+
+
+ +-----+         +-----------+     _     +------------+    +------+
+ | app | ------->| collector |--> (_) <--| aggregator |<---| view |--+
+ +-----+  Stats  +-----------+    data   +-+----------+    +------+  |
+         Uploader                          |    custom logic         |
+   (key, timestamp, data)                  +--> to get collected     |
+                                                 data, group by...   |
+                                                     ...plot stats <-+
+
+Demo:
+  git clone https://github.com/matteobertozzi/skvoz.git
+  cd skvoz
+  export PYTHONPATH=.
+
+  Run the services:
+      ./bin/skvoz-collector -d examples/tsdata -s examples/sink/sink.conf &
+      ./bin/skvoz-aggregator -d examples/tsdata &
+      ./bin/skvoz-visualizator -p example/pages -g example/graphs &
+
+  Run the 'demo-client':
+      ./examples/client/demo.py localhost:50595
+
+  Open a browser:
+      http://localhost:50597/demo
+      http://localhost:50597/demo2
+
+  Run the shell!
+    ./bin/skvoz-shell -d examples/tsdata
+
+    >> from tsfiles 'ping-google.com' split ms store min(ms), max(ms), avg(ms) group by hour;
+    >> from tsfile odd split n store min(n), max(n), count(n) group by minute;
+    >> from tsfile odd, even split n store count(n) as total group by key, minute;
+
+    >> from files 'demo-sink.data' split _, host, ms on '-', ' ' store host, ms;
+    >> from files 'demo-sink.data' split _, host, ms on '-', ' '
+    .. store host, ms WHERE host = 'github.com' and ms > 50;

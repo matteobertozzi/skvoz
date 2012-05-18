@@ -1,0 +1,57 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>Skvoz Demo</title>
+    <script type="text/javascript" src="http://code.jquery.com/jquery-1.7.2.min.js"></script>
+    <script type="text/javascript" src="http://www.google.com/jsapi"></script>
+    <script type="text/javascript">
+      google.load('visualization', '1', {packages: ['corechart']});
+    </script>
+    <script type="text/javascript">
+    google.load('visualization', '1');
+
+  function render_chart(uri) {
+    $.getJSON(uri, function(data) {
+      name = data['name'].replace('.', '-');
+
+      if (!document.getElementById(name)) {
+        $('<div>', {'id': name + '-chart', html: '<h3>' + data['name'] + '</h3>'}).appendTo('body');
+      }
+
+      $('<div>', {
+          'id': data['name'],
+          'style': 'width: 100%; height: 420px; margin: auto;',
+          html: ''
+      }).appendTo('#' + name + '-chart');
+
+      if (data['type'] == "google") {
+        new google.visualization.ChartWrapper(data['chart']).draw();
+      } else {
+        new Highcharts.Chart(data['chart']);
+      }
+    });
+  }
+
+  $(document).ready(function() {
+    render_chart('/skvoz/chart/ping.json?host=google.com&type=line&renderer=google');
+    render_chart('/skvoz/chart/ping.json?host=kernel.com&type=line&renderer=highchart');
+    render_chart('/skvoz/chart/ping.json?host=github.com&type=column&renderer=highchart');
+    render_chart('/skvoz/chart/oddeven.json');
+  })
+  </script>
+  <style type="text/css">
+  body {font: 12px "Helvetica Neue", Helvetica, Arial, sans-serif; color: #000000;}
+  table, tr, td {border: 1px solid #eeeeef;}
+  a:link {text-decoration: none}
+  a:visited {text-decoration: none}
+  a:active {text-decoration: none}
+  a:hover {text-decoration: underline;}
+  ul {list-stye: disc inside; background: #eeeeef; padding: 2px; text-align: center;}
+  ul li {display: inline-block; margin: 1px 4px 1px 4px;}
+  </style>
+</head>
+<body>
+  <script type="text/javascript" src="http://code.highcharts.com/2.2.0/highcharts.js"></script>
+</body>
+</html>

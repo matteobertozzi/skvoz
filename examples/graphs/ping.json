@@ -1,0 +1,9 @@
+{
+    "name": "ping${host}",
+    "title": "Ping ${host} Graph",
+    "subtitle": "avg by hour",
+    "renderer": "${renderer}",
+    "type": "${type}",
+    "aggregator": ["localhost", 50596],
+    "query": "FROM TSFILES ping-${host} as ${host} split ms store avg(ms) group by hours"
+}

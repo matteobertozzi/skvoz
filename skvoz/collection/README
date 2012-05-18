@@ -1,0 +1,16 @@
+  ____  _
+ / ___|| | ____   _____ ____
+ \___ \| |/ /\ \ / / _ \_  /
+  ___) |   <  \ V / (_) / /
+ |____/|_|\_\  \_/ \___/___|
+                  collection
+
+The collector service is a simple TCP/Unix server that reads key-timestamped
+lines sended by the client.
+
+The line format is "key, timestamp, value" where timestamp is a msec int.
+The client can send "key - value" to use the server time.
+
+Where is the data stored?
+-------------------------
+By default each key is stored in a log file (sort is not guaranteed)

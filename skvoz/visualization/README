@@ -1,0 +1,24 @@
+  ____  _
+ / ___|| | ____   _____ ____
+ \___ \| |/ /\ \ / / _ \_  /
+  ___) |   <  \ V / (_) / /
+ |____/|_|\_\  \_/ \___/___|
+               visualization
+
+The visualization server is a simple http server that able to serve html pages
+in the specified "pages directory" and also graphs.
+
+Graphs are defined by using json
+{
+    "name": "test-graph",
+    "title": "Test graph",
+    "subtitle": "test, test, test",
+    "type": "column",
+    "aggregator": ['localhost', 8081],
+    "query": "from key split a, b store avg(a), b group by month"
+}
+
+Google Chart - https://developers.google.com/chart/
+HighChartsJS - http://www.highcharts.com/
+
+
