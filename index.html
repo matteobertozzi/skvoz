@@ -1,0 +1,80 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Skvoz by matteobertozzi</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>Skvoz</h1>
+        <p>collection, aggregation, visualization</p>
+        <p class="view"><a href="https://github.com/matteobertozzi/skvoz">View the Project on GitHub <small>matteobertozzi/skvoz</small></a></p>
+        <ul>
+          <li><a href="https://github.com/matteobertozzi/skvoz/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/matteobertozzi/skvoz/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/matteobertozzi/skvoz">View On <strong>GitHub</strong></a></li>
+        </ul>
+      </header>
+      <section>
+        <h2>Demo:</h2>
+
+<ul>
+<li>git clone <a href="https://github.com/matteobertozzi/skvoz.git">https://github.com/matteobertozzi/skvoz.git</a>
+</li>
+<li>cd skvoz</li>
+<li>
+<p>export PYTHONPATH=.</p>
+
+<h3>Run the services:</h3>
+
+<ul>
+<li>./bin/skvoz-collector -d examples/tsdata -s examples/sink/sink.conf &amp;</li>
+<li>./bin/skvoz-aggregator -d examples/tsdata &amp;</li>
+<li>./bin/skvoz-visualizator -p example/pages -g example/graphs &amp;</li>
+</ul>
+<h3>Run the 'demo-client':</h3>
+
+<ul>
+<li>./examples/client/demo.py localhost:50595</li>
+</ul>
+<h3>Open a browser:</h3>
+
+<ul>
+<li>http://localhost:50597/demo</li>
+<li>http://localhost:50597/demo2</li>
+</ul>
+<h3>Run the shell!</h3>
+
+<ul>
+<li>./bin/skvoz-shell -d examples/tsdata</li>
+</ul>
+<p><code>&gt;&gt; from tsfiles 'ping-google.com' split ms store min(ms), max(ms), avg(ms) group by hour;</code></p>
+
+<p><code>&gt;&gt; from tsfile odd split n store min(n), max(n), count(n) group by minute;</code></p>
+
+<p><code>&gt;&gt; from tsfile odd, even split n store count(n) as total group by key, minute;</code></p>
+
+<p><code>&gt;&gt; from file 'demo-sink.data' split _, host, ms on '-', ' ' store host, ms;</code></p>
+
+<p><code>&gt;&gt; from file 'demo-sink.data' split _, host, ms on '-', ' ' store host, ms WHERE host = 'github.com' and ms &gt; 50;</code></p>
+</li>
+</ul>
+      </section>
+      <footer>
+        <p>This project is maintained by <a href="https://github.com/matteobertozzi">matteobertozzi</a></p>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+    <script src="javascripts/scale.fix.js"></script>
+    
+  </body>
+</html>
