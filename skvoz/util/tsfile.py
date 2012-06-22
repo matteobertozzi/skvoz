@@ -170,6 +170,10 @@ def consolidate(path):
     t.start()
     return t
 
+def consolidate_sync(path):
+    t = consolidate(path)
+    t.join()
+
 def is_consolidated(name):
     return RX_CONSOLIDATED.match(name) is not None
 
@@ -287,7 +291,6 @@ if __name__ == '__main__':
         print 'usage: consolidate <filename>'
     else:
         st = time()
-        t = consolidate(sys.argv[1])
-        t.join()
+        consolidate_sync(sys.argv[1])
         et = time()
         print '[T] Consolidated in %.3fsec' % (et - st)
