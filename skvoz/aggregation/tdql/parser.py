@@ -32,6 +32,17 @@ from skvoz.aggregation.tdql import functions
 from skvoz.aggregation.tdql.tokenizer import *
 from skvoz.aggregation.tdql.rpn import *
 
+_FUNCTIONS_MAP = {
+    'min':   functions.MinFunction,
+    'max':   functions.MaxFunction,
+    'sum':   functions.SumFunction,
+    'sub':   functions.SubFunction,
+    'avg':   functions.AvgFunction,
+    'set':   functions.SetFunction,
+    'list':  functions.ListFunction,
+    'count': functions.CountFunction,
+}
+
 def _strip_plural(symbol):
     if symbol.endswith('s'):
         return symbol[:-1]
@@ -231,7 +242,7 @@ class StmtGroupBy(Stmt):
 
     def __init__(self):
         self.time_period = None
-        #self.splits = set()
+        self.splits = set()
         self.key = False
 
     def __contains__(self, key):
@@ -242,16 +253,15 @@ class StmtGroupBy(Stmt):
         if token == TOKEN_COMMA or (token == TOKEN_KEYWORD and symbol == 'by'):
             return
 
-        symbol = _strip_plural(symbol)
-        if symbol == 'key':
+        xsymbol = _strip_plural(symbol)
+        if xsymbol == 'key':
             self.key = True
-        elif symbol in self.TIME_GROUPS:
-            if self.time_period is not None and symbol != self.time_period:
+        elif xsymbol in self.TIME_GROUPS:
+            if self.time_period is not None and xsymbol != self.time_period:
                 raise StmtSyntaxError("Another time period already specified '%s'" % self.time_period)
-            self.time_period = symbol
+            self.time_period = xsymbol
         else:
-            #self.splits.add(symbol)
-            raise StmtSyntaxError("Invalid group '%s'." % symbol)
+            self.splits.add(symbol)
 
     def __repr__(self):
         return 'Group By Key=%r Period %r' % (self.key, self.time_period)
@@ -259,7 +269,7 @@ class StmtGroupBy(Stmt):
 class StmtWhere(Stmt):
     def __init__(self):
         self.clauses = None
-        self._infix2rpn = InfixToRpn()
+        self._infix2rpn = InfixToRpn(_FUNCTIONS_MAP.keys())
 
     def close(self):
         result = self._infix2rpn.evaluated_rpn()
@@ -277,26 +287,13 @@ class StmtWhere(Stmt):
         return 'Where %r' % self.clauses
 
 class StmtFunction(Stmt):
-    FUNCTIONS = ('min', 'max', 'avg', 'sum')
     def __init__(self):
-        self.content = InfixToRpn()
-        self.functions = {}
+        self.content = InfixToRpn(_FUNCTIONS_MAP.keys())
 
     def close(self):
         self.content = self.content.evaluated_rpn()
 
     def add(self, token, symbol):
-        if token == TOKEN_KEYWORD:
-            func_name = symbol.lower()
-            agfn = func_name.capitalize() + 'Function'
-            if hasattr(functions, agfn):
-                if len(self.functions) > 0:
-                    # TODO: Create two function category aggregation funcs and non
-                    #       to be able to do: avg(sin(x) + 2 * cos(y))
-                    raise StmtSyntaxError("Multi func not supported yet!")
-                self.functions[func_name] = getattr(functions, agfn)()
-                token = TOKEN_OPERATOR
-        assert isinstance(self.content, InfixToRpn), "Function already closed!"
         self.content.add(token, symbol)
 
     def is_null(self):
@@ -349,7 +346,7 @@ class StmtStore(Stmt):
 
     def functions(self):
         for key, func in self.results.iteritems():
-            yield key, functions.Executor(func.functions, func.content)
+            yield key, functions.Executor(_FUNCTIONS_MAP, func.content)
 
     def __repr__(self):
         return 'Store %r' % self.results

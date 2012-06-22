@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from skvoz.aggregation.tdql.tokenizer import TOKEN_NUMBER
+from skvoz.aggregation.tdql.tokenizer import TOKEN_NUMBER, TOKEN_STRING
 from skvoz.aggregation.tdql.rpn import rpn_evaluate
 
 class _Function(object):
@@ -58,8 +58,7 @@ class _Function(object):
 
 class Executor(_Function):
     def __init__(self, functions, rpn):
-        assert len(functions) <= 1, "TODO: Multi func not supported yet %r" % functions
-        self.functions = functions
+        self.functions = dict((k, f()) for k, f in functions.iteritems())
         self.fresult = None
         self.rpn = rpn
 
@@ -68,9 +67,9 @@ class Executor(_Function):
             f.reset()
 
     def result(self):
-        if len(self.fresult) != 1:
-            raise Exception("Invalid function result %r" % self.fresult)
-        return self.fresult[0][1]
+        if len(self.fresult) == 1:
+            return self.fresult[0][1]
+        return [r[1] for r in self.fresult]
 
     def apply(self, items):
         self.fresult = rpn_evaluate(self.rpn, dict(self.functions, **items))
@@ -138,3 +137,23 @@ class CountFunction(_Function):
 
     def apply(self, value):
         self.count += 1
+
+class ListFunction(_Function):
+    def reset(self):
+        self.data = []
+
+    def result(self):
+        return TOKEN_STRING, '[%s]' % ', '.join(self.data)
+
+    def apply(self, value):
+        self.data.append(value)
+
+class SetFunction(_Function):
+    def reset(self):
+        self.data = set()
+
+    def result(self):
+        return TOKEN_STRING, '[%s]' % ', '.join(self.data)
+
+    def apply(self, value):
+        self.data.add(value)

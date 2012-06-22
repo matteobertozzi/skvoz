@@ -44,6 +44,7 @@ class AggregationContext(object):
         self.data_split = None
         self.time_period = None
         self.group_period = None
+        self.group_splits = None
         self.data_filters = []
         self.functions = {}
         self._cfunctions = 0
@@ -212,5 +213,12 @@ def parse_query(query):
             if func is None:
                 raise Exception("Invalid grouping function '%s'!" % func_name)
             context.group_period = func
+
+        if query.stmt_group.splits:
+            splits = set(query.stmt_split.results) if query.stmt_split else set()
+            context.group_splits = query.stmt_group.splits & splits
+            unknown = query.stmt_group.splits - splits
+            if len(unknown) > 0:
+                raise Exception("Unknown groups (%s)" % ', '.join(unknown))
 
     return context, query.stmt_from.source, query.stmt_from.keys, group_by_key
