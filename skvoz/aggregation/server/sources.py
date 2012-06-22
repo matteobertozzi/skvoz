@@ -25,6 +25,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+from glob import glob
+
 from skvoz.util.dateutil import date_to_timestamp
 from skvoz.util import tsfile
 
@@ -46,6 +48,7 @@ class AggregatorFile(AggregatorSource):
 
     def files_from_keys(self, keys):
         for key, files in keys.iteritems():
+            files = sum([glob(f) for f in files], [])
             yield key, tuple(f for f in files if os.path.exists(f))
 
 class AggregatorTsFile(AggregatorSource):
