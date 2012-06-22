@@ -96,7 +96,7 @@ class DataTable(object):
     def addRow(self, row):
         if isinstance(row, dict):
             if len(self.columns) == 0:
-                self.columns.extend(row.keys())
+                self.columns.extend(sorted(row.keys()))
 
             irow = [None] * len(self.columns)
             for col, value in row.iteritems():
@@ -123,6 +123,8 @@ class DataTable(object):
     def show(self):
         lencols = [max(len(str(row)) for row in self.columnRows(i))
                                      for i in xrange(len(self.columns))]
+        lencols = [max(clen, len(c)) for clen, c in zip(lencols, self.columns)]
+
         hfrmt = ' {0:^{w}} '
         rfrmt = ' {0:<{w}} '
 

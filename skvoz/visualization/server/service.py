@@ -44,15 +44,21 @@ import re
 def fetch_data_table(address, query):
     table = DataTable()
     for line in http_readlines(address, '/query', {'query': b64encode(query)}):
-        ts, data = json_loads(line)
+        data = json_loads(line)
 
         if not isinstance(data, dict):
             _data = {}
-            for key, kdata in data:
+            keys, gdata = data
+            if '__ts__' in keys:
+                _data['__ts__'] = keys.pop('__ts__')
+            keys = ''.join(keys)
+            for kdata in gdata:
                 for k, v in kdata.iteritems():
-                    _data['%s %s' % (key, k)] = v
+                    _data['%s%s' % (keys, k)] = v
             data = _data
-        data['__ts__'] = ts
+
+        data.pop('__key__', None)
+        print data
         table.addRow(data)
     return table
 

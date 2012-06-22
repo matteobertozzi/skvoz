@@ -1,5 +1,5 @@
 {
-    "name": "ping${host}",
+    "name": "ping-${host}",
     "title": "Ping ${host} Graph",
     "subtitle": "avg by hour",
     "renderer": "${renderer}",

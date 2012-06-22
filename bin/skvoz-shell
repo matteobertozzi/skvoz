@@ -28,6 +28,7 @@ from time import time
 
 from skvoz.aggregation.server.engine import AggregatorEngine, execute_query
 from skvoz.aggregation.server import sources
+from skvoz.util.data import DataTable
 from skvoz.util import cmdline
 
 import logging
@@ -95,9 +96,14 @@ if __name__ == '__main__':
         # Execute an aggregator query
         try:
             st = time()
-            for ts, data in execute_query(engine, query):
-                print ts, data
+            for key, data in execute_query(engine, query):
+                table = DataTable()
+                table.addRows(data)
+                if key is not None:
+                    print key
+                table.show()
             et = time()
             print 'Query executed in %.3fsec' % (et - st)
         except Exception, e:
             print 'query failure:', e
+

@@ -25,9 +25,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from collections import defaultdict
 from heapq import merge
 
+from skvoz.aggregation.server import table
 from skvoz.aggregation.util import timestamps
 from skvoz.aggregation import tdql
 from skvoz.util.data import DataSplitter
@@ -44,42 +44,43 @@ class AggregationContext(object):
         self.data_split = None
         self.time_period = None
         self.group_period = None
-        self.group_splits = None
+        self.group_keys = None
         self.data_filters = []
         self.functions = {}
-        self._cfunctions = 0
 
     def functions_reset(self):
-        self._cfunctions = 0
         for _, func in self.functions.iteritems():
             func.reset()
 
     def functions_apply(self, items):
-        self._cfunctions += 1
         for func in self.functions.itervalues():
             func.apply(items)
 
     def functions_results(self):
-        if self._cfunctions == 0:
-            return None
-
         results = {}
         for key, func in self.functions.iteritems():
             results[key] = func.result()
         return results
+
+    def aggregate_results(self, rows, groups=None):
+        print 'AGGREGATE'
+        if self.functions:
+            print 'STEP 1'
+            self.functions_reset()
+            print 'STEP 2'
+            for items in rows:
+                if groups: 
+                    print 'GROUPS', groups
+                    items.update(groups)
+                self.functions_apply(items)
+            return [self.functions_results()]
+        return list(rows)
 
     def filter_row(self, items):
         for func in self.data_filters:
             if func(items):
                 return True
         return False
-
-    def results_keys(self):
-        if len(self.functions) > 0:
-            return self.functions.keys()
-        if self.data_split is not None:
-            return self.data_split.varnames
-        return None
 
 class AggregatorEngine(object):
     """
@@ -97,34 +98,44 @@ class AggregatorEngine(object):
         source = self.sources.get(source_name)
         if source is None:
             raise Exception("Invalid Source '%s'!" % source_name)
-
-        if group_by_key:
-            return self._fetch_grouped(context, source, keys)
-        return self._fetch_ungrouped(context, source, keys)
-
-    def _fetch_grouped(self, context, source, keys):
+        
         data = []
         groups = []
         for group, files in source.files_from_keys(keys):
             groups.append(group)
-            data.append(self.fetch_files(context, source, files, group))
+            data.append(self.fetch_files(context, source, group, files))
 
-        values = []
-        last_ts = None
-        for ts, v, key in merge(*data):
-            if ts != last_ts and last_ts is not None:
-                yield last_ts, values
-                values = []
-            values.append((key, v)) # TODO: CHANGE MERGE POLICY
-            last_ts = ts
-        if len(values) > 0:
-            yield last_ts, values
+        if context.data_split is None:
+            dtb = self._merge_raw(context, data)
+        else:
+            dtb = self._merge_splits(context, data)
 
-    def _fetch_ungrouped(self, context, source, keys):
-        files = sum([list(ks) for _, ks in source.files_from_keys(keys)], [])
-        return self.fetch_files(context, source, files)
+        if context.group_keys:
+            results = table.group_by(dtb, context.group_keys)
+            return [(k, context.aggregate_results(r, k)) for k, r in results]
 
-    def fetch_files(self, context, source, files, group=None):
+        return [(None, context.aggregate_results(dtb))]
+
+    def _merge_raw(self, context, data):
+        columns = ['__ts__', '__key__', 'data']
+
+        dtb = table.Table('foo', columns)
+        for ts, key, value in merge(*data):
+            dtb.insert({'__ts__': ts, '__key__': key, 'data': value})
+
+        return dtb
+
+    def _merge_splits(self, context, data):
+        columns = ['__ts__', '__key__'] + context.data_split.varnames
+
+        dtb = table.Table('foo', columns)
+        for ts, key, items in merge(*data):
+            items.update({'__ts__': ts, '__key__': key})
+            dtb.insert(items)
+
+        return dtb
+
+    def fetch_files(self, context, source, group, files):
         # Initialize Time Period Filter
         if context.time_period:
             files = source.filter_files_by_time(files, *context.time_period)
@@ -136,38 +147,16 @@ class AggregatorEngine(object):
         gf = context.group_period or _group_bypass
 
         # Read Data with Filters
-        if group is None:
-            for ts, values in gf(ff(source.read_files(files))):
-                for v in self._fetch_values(context, values):
-                    yield ts, v
-        else:
-            for ts, values in gf(ff(source.read_files(files))):
-                for v in self._fetch_values(context, values):
-                    yield ts, v, group
-
-    def _fetch_values(self, context, values):
-        # TODO:
-        #   - Add Grouping on split
-        #   - OPTIMIZE: Move filter_row() in source
-        if context.data_split:
-            if context.functions:
-                context.functions_reset()
+        for ts, values in gf(ff(source.read_files(files))):
+            if context.data_split:
                 for _, v in values:
                     items = context.data_split(v)
-                    if context.filter_row(items): continue
-                    context.functions_apply(items)
-                results = context.functions_results()
-                if results is not None: yield results
+                    if context.filter_row(items): 
+                        continue
+                    yield ts, group, items
             else:
-                results = defaultdict(list)
                 for _, v in values:
-                    items = context.data_split(v)
-                    if context.filter_row(items): continue
-                    for ik, iv in items.iteritems():
-                        results[ik].append(iv)
-                if len(results) > 0: yield dict(results)
-        else:
-            yield [v for _, v in values]
+                    yield ts, group, v
 
 # From {files: ['a', 'b', 'c']}
 # Time Intervals [datetime.datetime(2012, 1, 1, 0, 0)]
@@ -175,8 +164,8 @@ class AggregatorEngine(object):
 # Split ['a', 'b', 'c'] On [':']
 # Store {'average': Func avg(a), 'total': Func sum(b)}
 def execute_query(engine, query):
-    context, source, keys, group_by_key = parse_query(query)
-    return engine.fetch(context, source, keys, group_by_key)
+    context, source, keys = parse_query(query)
+    return engine.fetch(context, source, keys)
 
 def parse_query(query):
     # Parse the user query
@@ -204,9 +193,7 @@ def parse_query(query):
             context.time_period = (query.stmt_time.start, query.stmt_time.end)
 
     # Extract grouping functions
-    group_by_key = False
     if query.stmt_group is not None:
-        group_by_key = query.stmt_group.key
         if query.stmt_group.time_period is not None:
             func_name = 'group_by_' + query.stmt_group.time_period
             func = getattr(timestamps, func_name)
@@ -214,11 +201,13 @@ def parse_query(query):
                 raise Exception("Invalid grouping function '%s'!" % func_name)
             context.group_period = func
 
-        if query.stmt_group.splits:
-            splits = set(query.stmt_split.results) if query.stmt_split else set()
-            context.group_splits = query.stmt_group.splits & splits
-            unknown = query.stmt_group.splits - splits
+        if query.stmt_group.keys:
+            splits = set(('__ts__', '__key__'))
+            if query.stmt_split: splits |= set(query.stmt_split.results)
+            unknown = set(query.stmt_group.keys) - splits
             if len(unknown) > 0:
                 raise Exception("Unknown groups (%s)" % ', '.join(unknown))
 
-    return context, query.stmt_from.source, query.stmt_from.keys, group_by_key
+            context.group_keys = query.stmt_group.keys
+
+    return context, query.stmt_from.source, query.stmt_from.keys

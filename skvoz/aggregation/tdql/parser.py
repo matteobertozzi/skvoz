@@ -242,8 +242,7 @@ class StmtGroupBy(Stmt):
 
     def __init__(self):
         self.time_period = None
-        self.splits = set()
-        self.key = False
+        self.keys = []
 
     def __contains__(self, key):
         return key in self.groups
@@ -255,16 +254,17 @@ class StmtGroupBy(Stmt):
 
         xsymbol = _strip_plural(symbol)
         if xsymbol == 'key':
-            self.key = True
+            self.keys.append('__key__')
         elif xsymbol in self.TIME_GROUPS:
             if self.time_period is not None and xsymbol != self.time_period:
                 raise StmtSyntaxError("Another time period already specified '%s'" % self.time_period)
             self.time_period = xsymbol
+            self.keys.append('__ts__')
         else:
-            self.splits.add(symbol)
+            self.keys.append(symbol)
 
     def __repr__(self):
-        return 'Group By Key=%r Period %r' % (self.key, self.time_period)
+        return 'Group By %r' % (self.keys)
 
 class StmtWhere(Stmt):
     def __init__(self):
