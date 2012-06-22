@@ -75,16 +75,28 @@ def _rpn_unary_evaluate(operation, operand, context=None):
 
     if operation == '-': return -operand
 
-    func_operation = context.get(operation, operation)
-    if hasattr(func_operation, '__call__'):
-        return func_operation(operand)
-
     raise Exception("Unary operation not handled '%r' on '%r'" % (operation, operand))
+
+def _rpn_function_evaluate(function, args, context):
+    #print 'FUNCTION', function, args
+    function = context[function]
+    assert hasattr(function, '__call__')
+
+    args = [rpn_evaluate(arg, context)[0][1] for arg in args]
+    return function(*args)
 
 def rpn_evaluate(expr_tokens, context=None):
     op_stack = []
     for token, symbol in expr_tokens:
-        if token == TOKEN_OPERATOR:
+        if token == TOKEN_FUNCTION:
+            try:
+                fargs = op_stack.pop()
+                r = _rpn_function_evaluate(symbol, fargs[1], context)
+                op_stack.append(r)
+            except:
+                op_stack.append(fargs)
+                op_stack.append((token, symbol))
+        elif token == TOKEN_OPERATOR:
             if len(op_stack) > 1:
                 try:
                     op_right = op_stack.pop()
@@ -116,7 +128,10 @@ def rpn_evaluate(expr_tokens, context=None):
 def rpn_to_infix_string(expr_tokens):
     stack = []
     for token, symbol in expr_tokens:
-        if token == TOKEN_OPERATOR:
+        if token == TOKEN_FUNCTION:
+            fargs = stack.pop()
+            stack.append('%s(%s)' % (symbol, ', '.join([rpn_to_infix_string(a) for a in fargs])))
+        elif token == TOKEN_OPERATOR:
             if len(stack) > 1:
                 op_right = stack.pop()
                 op_left = stack.pop()
@@ -126,6 +141,10 @@ def rpn_to_infix_string(expr_tokens):
                 stack.append('%s(%s)' % (symbol, op))
         else:
             stack.append(symbol)
+
+    if len(stack) > 1:
+        raise Exception("Invalid syntax")
+
     return str(stack[-1])
 
 class RpnEvaluator(object):
@@ -163,10 +182,12 @@ class InfixToRpn(object):
         ('OR', ),
     )
 
-    def __init__(self):
+    def __init__(self, functions=[]):
         self.stack = []
         self.count = 0
         self.rpn_tokens = []
+        self.func_context = []
+        self.functions = functions
 
     def rpn(self):
         stack = self.stack
@@ -185,6 +206,17 @@ class InfixToRpn(object):
 
     def add(self, token, symbol):
         stack = self.stack
+
+        if len(self.func_context) > 0:
+            fctx = self.func_context[-1]
+            if not (token == TOKEN_PARENTHESES_CLOSE and fctx.count == 0):
+                if token == TOKEN_COMMA:
+                    stack.append(fctx.rpn())
+                    self.func_context[-1] = InfixToRpn(self.functions)
+                else:
+                    fctx.add(token, symbol)
+                return
+
         if token == TOKEN_OPERATOR:
             while len(stack) > 0 and stack[-1][0] == TOKEN_OPERATOR:
                 if self._cmp_precedence(symbol, stack[-1][1]) <= 0:
@@ -193,12 +225,24 @@ class InfixToRpn(object):
                 break
             stack.append((token, symbol))
         elif token == TOKEN_PARENTHESES_OPEN:
+            if len(self.rpn_tokens) > 0 and self.rpn_tokens[-1][1] in self.functions:
+                self.func_context.append(InfixToRpn(self.functions))
+
             self.count += 1
             stack.append((token, symbol))
         elif token == TOKEN_PARENTHESES_CLOSE:
             self.count -= 1
-            while len(stack) > 0 and stack[-1][0] != TOKEN_PARENTHESES_OPEN:
-                self.rpn_tokens.append(stack.pop())
+            if len(self.func_context) > 0:
+                fctx = self.func_context.pop()
+                args = [fctx.rpn()]
+                while len(stack) > 0 and stack[-1][0] != TOKEN_PARENTHESES_OPEN:
+                    args.insert(0, stack.pop())
+                _, sym = self.rpn_tokens.pop()
+                self.rpn_tokens.append((TOKEN_FUNCTION_ARGS, args))
+                self.rpn_tokens.append((TOKEN_FUNCTION, sym))
+            else:
+                while len(stack) > 0 and stack[-1][0] != TOKEN_PARENTHESES_OPEN:
+                    self.rpn_tokens.append(stack.pop())
             stack.pop()
         else:
             self.rpn_tokens.append((token, symbol))
@@ -219,8 +263,22 @@ class InfixToRpn(object):
         return p1 - p2
 
     @classmethod
-    def parse(cls, expr_tokens):
-        infix2rpn = InfixToRpn()
+    def parse(cls, expr_tokens, functions=None):
+        infix2rpn = InfixToRpn(functions)
         for token, symbol in expr_tokens:
+            if token == TOKEN_KEYWORD and symbol.upper() in functions:
+                token = TOKEN_OPERATOR
             infix2rpn.add(token, symbol)
         return infix2rpn.rpn()
+
+if __name__ == '__main__':
+    def _ident(x): return TOKEN_NUMBER, x
+    def _sum(a, b): return TOKEN_NUMBER, a + b
+
+    functions = {'func': _ident, 'sum': _sum}
+    context = {'a': 10, 'b': 20}
+    context.update(functions)
+    expr = 'func(a) + 2'
+    expr = 'sum(a, func(b) + 2) * 2'
+    print rpn_to_infix_string(rpn_evaluate(InfixToRpn.parse(tokenize(expr), functions.keys()), context))
+
