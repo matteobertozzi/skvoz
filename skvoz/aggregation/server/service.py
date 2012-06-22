@@ -26,6 +26,7 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from json import dumps as json_dumps
+from base64 import b64decode
 
 from skvoz.aggregation.server import sources
 from skvoz.aggregation.server import engine
@@ -37,8 +38,9 @@ class AggregatorRequestHandler(HttpRequestHandler):
     @HttpRequestHandler.match("/query$", commands='POST')
     def tdql_query(self):
         request = dict(self._post_data())
-        query = request['query']
+        query = b64decode(request['query'])
 
+        self.send_headers(200, 'text/plain')
         for result in engine.execute_query(self.server.engine, query):
             self.wfile.write(json_dumps(result) + '\n')
 

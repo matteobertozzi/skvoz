@@ -86,7 +86,7 @@ class AbstractService(object):
             self.log_message("%s %s is stopping\n" % (self.__class__.__name__, address))
 
             self._stopping(*args, **kwargs)
-            self.server.server_close()
+            self.server.shutdown()
             if isinstance(address, basestring) and os.path.exists(address):
                 os.unlink(address)
 

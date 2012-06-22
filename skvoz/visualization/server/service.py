@@ -34,6 +34,7 @@ from skvoz.util.http import http_readlines
 from skvoz.util.data import DataTable
 
 from json import loads as json_loads
+from base64 import b64encode
 
 import skvoz
 
@@ -42,8 +43,9 @@ import re
 
 def fetch_data_table(address, query):
     table = DataTable()
-    for line in http_readlines(address, '/query', {'query': query}):
+    for line in http_readlines(address, '/query', {'query': b64encode(query)}):
         ts, data = json_loads(line)
+
         if not isinstance(data, dict):
             _data = {}
             for key, kdata in data:
@@ -55,7 +57,6 @@ def fetch_data_table(address, query):
     return table
 
 def _load_and_replace_vars(path, query_vars):
-    print query_vars
     fd = file(path)
     try:
         data = fd.read()
